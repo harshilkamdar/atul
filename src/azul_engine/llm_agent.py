@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from .actions import Action
 from .agents import prune_and_order_actions
 from .state import GameState
+from .serialization import state_to_dict
 
 
 DEFAULT_MODEL = "google/gemini-3-pro-preview"
@@ -42,29 +43,7 @@ def _format_action(idx: int, action: Action) -> str:
 
 
 def _render_prompt(state: GameState, actions: list[Action]) -> str:
-    def board_summary(player_idx: int) -> dict:
-        p = state.players[player_idx]
-        return {
-            "score": p.score,
-            "pattern_lines": [[t.value for t in line] for line in p.pattern_lines],
-            "wall": [[bool(x) for x in row] for row in p.wall],
-            "floor_line": [t.value for t in p.floor_line],
-            "has_first_player_token": p.has_first_player_token,
-        }
-
-    state_block = {
-        "round": state.round_number,
-        "phase": state.phase.value,
-        "current_player": state.current_player,
-        "supply": {
-            "factories": [[t.value for t in f] for f in state.supply.factories],
-            "center": [t.value for t in state.supply.center],
-            "bag_count": len(state.supply.bag),
-            "discard_count": len(state.supply.discard),
-            "first_player_token_in_center": state.first_player_token_in_center,
-        },
-        "players": [board_summary(i) for i in range(len(state.players))],
-    }
+    state_block = state_to_dict(state)
 
     lines = [
         RULES_TEXT,
