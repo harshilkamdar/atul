@@ -1,16 +1,10 @@
 import os
 import random
-import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
 from .llm_vs_llm import run_series
-
-try:
-    from tqdm import tqdm  # type: ignore
-except Exception:  # pragma: no cover - optional
-    tqdm = None
 
 
 @dataclass(frozen=True)
@@ -106,11 +100,10 @@ def _build_tasks(
 def _run_task(
     task: Task,
     provider_map: dict[str, tuple[str, ...] | None],
-    on_turn,
-) -> None:
+) -> dict:
     os.makedirs(task.out_path.parent, exist_ok=True)
     with task.out_path.open("w", encoding="utf-8") as out:
-        run_series(
+        results = run_series(
             task.model_a,
             task.model_b,
             games=1,
@@ -118,8 +111,10 @@ def _run_task(
             out=out,
             providers_a=provider_map.get(task.model_a),
             providers_b=provider_map.get(task.model_b),
-            on_turn=on_turn,
         )
+    result = results[0] if results else {}
+    result["out_path"] = str(task.out_path)
+    return result
 
 
 def run_arena(
@@ -149,39 +144,14 @@ def run_arena(
     if max_workers == 0:
         return [task.out_path for task in tasks]
 
-    tqdm_func = tqdm if callable(tqdm) else None
-    turn_bar = None
-    turn_lock = None
-    on_turn = None
-    if progress and tqdm_func is not None:
-        turn_lock = threading.Lock()
-        turn_bar = tqdm_func(total=None, desc="turns", position=1, leave=False)
-
-        def on_turn(info) -> None:
-            model_a, model_b = info["models"]
-            score_a, score_b = info["scores"]
-            def short(name: str, limit: int = 24) -> str:
-                return name if len(name) <= limit else f"{name[:limit-3]}..."
-
-            label = f"g{info['game']} {short(model_a)} vs {short(model_b)} | {score_a}-{score_b}"
-            with turn_lock:
-                turn_bar.set_postfix_str(label)
-                turn_bar.update(1)
-
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(_run_task, task, provider_map, on_turn): task for task in tasks}
-        if progress and tqdm_func is not None:
-            for future in tqdm_func(as_completed(futures), total=total, desc="games", position=0):
-                future.result()
-        else:
-            completed = 0
-            for future in as_completed(futures):
-                future.result()
-                completed += 1
-                if progress:
-                    print(f"{completed}/{total} complete")
-
-    if turn_bar is not None:
-        turn_bar.close()
+        futures = {executor.submit(_run_task, task, provider_map): task for task in tasks}
+        for future in as_completed(futures):
+            result = future.result()
+            if progress and result:
+                models = result.get("models") or []
+                scores = result.get("scores") or []
+                if len(models) == 2 and len(scores) == 2:
+                    print(f"{models[0]} vs {models[1]} | {scores[0]}-{scores[1]}")
 
     return [task.out_path for task in tasks]
