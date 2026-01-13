@@ -9,6 +9,7 @@ from .features import (
 )
 from .model import AzulNet
 from .mcts import MCTS
+from .train import train_loop
 from .alphazero import (
     LossWeights,
     ReplayBuffer,
@@ -30,6 +31,7 @@ __all__ = [
     "legal_action_indices",
     "AzulNet",
     "MCTS",
+    "train_loop",
     "LossWeights",
     "ReplayBuffer",
     "SelfPlayConfig",
