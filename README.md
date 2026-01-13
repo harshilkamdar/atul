@@ -41,3 +41,18 @@ Win rate counts draws as 0.5 win.
 | x-ai/grok-4.1-fast | 44.2 | 48 | 22 | 22 | 4 | 50.0% | -68.8–141.2 |
 | openai/gpt-oss-120b | -79.4 | 66 | 17 | 46 | 3 | 28.0% | -186.9–37.9 |
 | anthropic/claude-haiku-4.5 | -175.1 | 10 | 2 | 8 | 0 | 20.0% | -464.1–9.3 |
+
+### Opponent-aware rationale rate
+
+Counts turns where `llm_rationale` matches opponent/deny/block/sabotage-style language.
+Script: `notebooks/opponent_mentions.py`.
+This is a rough proxy for opponent modeling and adversarial awareness in explanations.
+It helps compare how often models explicitly reason about the other player’s incentives.
+
+| Model | Turns | Opponent-Aware Mentions | Rate |
+| --- | --- | --- | --- |
+| openai/gpt-5-mini | 1995 | 708 | 35.49% |
+| x-ai/grok-4.1-fast | 1462 | 395 | 27.02% |
+| google/gemini-3-flash-preview | 1965 | 505 | 25.70% |
+| openai/gpt-oss-120b | 1919 | 226 | 11.78% |
+| anthropic/claude-haiku-4.5 | 261 | 7 | 2.68% |
