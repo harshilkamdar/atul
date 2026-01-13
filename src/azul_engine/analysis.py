@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 
-from .state import GameState, WALL_COLOR_TO_COL
 from .enums import TileColor
+from .state import GameState, WALL_COLOR_TO_COL
+
+BOARD_SIZE = 5
 
 
 @dataclass
@@ -21,51 +23,60 @@ class GameStats:
     total_moves: int
 
 
+def _line_len(wall, r, c, dr, dc):
+    length = 1
+    rr = r + dr
+    cc = c + dc
+    while 0 <= rr < BOARD_SIZE and 0 <= cc < BOARD_SIZE and wall[rr][cc]:
+        length += 1
+        rr += dr
+        cc += dc
+    rr = r - dr
+    cc = c - dc
+    while 0 <= rr < BOARD_SIZE and 0 <= cc < BOARD_SIZE and wall[rr][cc]:
+        length += 1
+        rr -= dr
+        cc -= dc
+    return length
+
+
 def compute_stats(state: GameState) -> GameStats:
     players = state.players
     stats = [PlayerStats(final_score=p.score) for p in players]
 
     for idx, player in enumerate(players):
-        for r in range(5):
-            for c in range(5):
-                if player.wall[r][c]:
-                    stats[idx].wall_placements += 1
-                    horiz = 1
-                    cc = c - 1
-                    while cc >= 0 and player.wall[r][cc]:
-                        horiz += 1
-                        cc -= 1
-                    cc = c + 1
-                    while cc < 5 and player.wall[r][cc]:
-                        horiz += 1
-                        cc += 1
-                    vert = 1
-                    rr = r - 1
-                    while rr >= 0 and player.wall[rr][c]:
-                        vert += 1
-                        rr -= 1
-                    rr = r + 1
-                    while rr < 5 and player.wall[rr][c]:
-                        vert += 1
-                        rr += 1
-                    if horiz == 1 and vert == 1:
-                        stats[idx].isolated_placements += 1
-                        stats[idx].adjacency_points += 1
-                    else:
-                        stats[idx].adjacent_placements += 1
-                        stats[idx].adjacency_points += horiz + vert - 1
+        wall = player.wall
+        player_stats = stats[idx]
+        for r in range(BOARD_SIZE):
+            row = wall[r]
+            for c in range(BOARD_SIZE):
+                if not row[c]:
+                    continue
+                player_stats.wall_placements += 1
+                horiz = _line_len(wall, r, c, 0, 1)
+                vert = _line_len(wall, r, c, 1, 0)
+                if horiz == 1 and vert == 1:
+                    player_stats.isolated_placements += 1
+                    player_stats.adjacency_points += 1
+                else:
+                    player_stats.adjacent_placements += 1
+                    player_stats.adjacency_points += horiz + vert - 1
 
     for idx, player in enumerate(players):
-        for r in range(5):
-            if all(player.wall[r]):
-                stats[idx].endgame_bonus += 2
-        for c in range(5):
-            if all(player.wall[r][c] for r in range(5)):
-                stats[idx].endgame_bonus += 7
-        for color in TileColor:
-            if all(player.wall[r][WALL_COLOR_TO_COL[r][color]] for r in range(5)):
-                stats[idx].endgame_bonus += 10
+        wall = player.wall
+        player_stats = stats[idx]
+        player_stats.endgame_bonus += 2 * sum(1 for row in wall if all(row))
+        player_stats.endgame_bonus += 7 * sum(
+            1
+            for c in range(BOARD_SIZE)
+            if all(wall[r][c] for r in range(BOARD_SIZE))
+        )
+        player_stats.endgame_bonus += 10 * sum(
+            1
+            for color in TileColor
+            if all(wall[r][WALL_COLOR_TO_COL[r][color]] for r in range(BOARD_SIZE))
+        )
 
-    total_moves = state.round_number * len(players) * 5  # upper bound proxy if we didn't log
+    total_moves = state.round_number * len(players) * BOARD_SIZE
 
     return GameStats(per_player=stats, total_moves=total_moves)

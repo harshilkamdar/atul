@@ -23,8 +23,4 @@ def play_game(agents: list[Agent], *, seed: int | None = None) -> GameResult:
 
 
 def play_series(agents: list[Agent], games: int, *, seed: int | None = None) -> list[GameResult]:
-    results = []
-    for i in range(games):
-        game_seed = None if seed is None else seed + i
-        results.append(play_game(agents, seed=game_seed))
-    return results
+    return [play_game(agents, seed=None if seed is None else seed + i) for i in range(games)]

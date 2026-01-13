@@ -1,6 +1,7 @@
 import json
 
 from azul_engine import GameEngine, LLMAgent, MCTSAgent
+from azul_engine.serialization import action_to_dict
 
 
 def _extract_rationale(raw: str | None) -> str | None:
@@ -13,31 +14,17 @@ def _extract_rationale(raw: str | None) -> str | None:
     return data.get("rationale")
 
 
-def _action_signature(action) -> tuple:
-    return (
-        action.source_index,
-        action.color,
-        action.pattern_line,
-        action.take_first_player_token,
-    )
-
-
 def _diff_action(chosen, optimal) -> str:
-    if _action_signature(chosen) == _action_signature(optimal):
+    chosen_dict = action_to_dict(chosen)
+    optimal_dict = action_to_dict(optimal)
+    if chosen_dict == optimal_dict:
         return "match"
-    diffs = []
-    if chosen.source_index != optimal.source_index:
-        diffs.append(f"source_index {chosen.source_index} != {optimal.source_index}")
-    if chosen.color != optimal.color:
-        diffs.append(f"color {chosen.color} != {optimal.color}")
-    if chosen.pattern_line != optimal.pattern_line:
-        diffs.append(f"pattern_line {chosen.pattern_line} != {optimal.pattern_line}")
-    if chosen.take_first_player_token != optimal.take_first_player_token:
-        diffs.append(
-            "take_first_player_token "
-            f"{chosen.take_first_player_token} != {optimal.take_first_player_token}"
-        )
-    return "; ".join(diffs)
+    fields = ("source_index", "color", "pattern_line", "take_first_player_token")
+    return "; ".join(
+        f"{field} {chosen_dict[field]} != {optimal_dict[field]}"
+        for field in fields
+        if chosen_dict[field] != optimal_dict[field]
+    )
 
 
 def play_llm_vs_llm_with_mcts(
@@ -66,13 +53,13 @@ def play_llm_vs_llm_with_mcts(
             "player": current,
             "model": agent.model,
             "scores_before": [p.score for p in state.players],
-            "llm_action": _action_signature(action),
+            "llm_action": action_to_dict(action),
             "llm_action_id": agent.last_action_id,
             "llm_action_desc": agent.last_action_desc,
             "llm_fallback": agent.last_used_fallback,
             "llm_rationale": _extract_rationale(agent.last_raw),
             "llm_reasoning": agent.last_reasoning,
-            "mcts_action": _action_signature(optimal),
+            "mcts_action": action_to_dict(optimal),
             "diff": _diff_action(action, optimal),
         }
         turns.append(entry)

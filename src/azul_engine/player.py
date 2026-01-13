@@ -15,8 +15,6 @@ def default_wall():
 
 @dataclass
 class PlayerBoard:
-    """Represents a player's board, score, and penalties."""
-
     pattern_lines: list[list[TileColor]] = field(default_factory=default_pattern_lines)
     wall: list[list[bool]] = field(default_factory=default_wall)
     floor_line: list[TileColor] = field(default_factory=list)

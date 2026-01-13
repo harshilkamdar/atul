@@ -168,8 +168,6 @@ class LLMAgent:
                 self.last_error = str(exc)
                 self.last_status = None
                 self.last_failure_reason = "call_exception"
-            if attempt == 0:
-                continue
         # Fallback: pick a random legal action and warn.
         self.last_used_fallback = True
         snippet = (self.last_raw or "").replace("\n", " ")
@@ -185,13 +183,9 @@ class LLMAgent:
             snippet or None,
         )
         chosen = random.choice(actions)
-        try:
-            action_id = actions.index(chosen)
-        except ValueError:
-            action_id = None
+        action_id = actions.index(chosen)
         self.last_action_id = action_id
-        if action_id is not None:
-            self.last_action_desc = _format_action(action_id, chosen)
+        self.last_action_desc = _format_action(action_id, chosen)
         return chosen
 
     def render_prompt(self, state: GameState) -> str:

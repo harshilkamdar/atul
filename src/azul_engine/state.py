@@ -14,8 +14,27 @@ WALL_PATTERN = [
 ]
 WALL_COLOR_TO_COL = [{color: col for col, color in enumerate(row)} for row in WALL_PATTERN]
 
+BOARD_SIZE = 5
+
 FLOOR_PENALTIES = (-1, -1, -2, -2, -2, -3, -3)
 TILES_PER_COLOR = 20
+
+
+def _line_len(wall, row, col, dr, dc):
+    length = 1
+    r = row + dr
+    c = col + dc
+    while 0 <= r < BOARD_SIZE and 0 <= c < BOARD_SIZE and wall[r][c]:
+        length += 1
+        r += dr
+        c += dc
+    r = row - dr
+    c = col - dc
+    while 0 <= r < BOARD_SIZE and 0 <= c < BOARD_SIZE and wall[r][c]:
+        length += 1
+        r -= dr
+        c -= dc
+    return length
 
 
 @dataclass
@@ -69,55 +88,33 @@ class GameState:
         can_place = self._can_place_in_line
         line_count = len(PATTERN_LINE_SIZES)
         floor = Action.FLOOR
-        center_idx = Action.CENTER
 
-        for source_index, tiles in enumerate(self.supply.factories):
+        def add_actions(source_index, tiles, take_token):
             if not tiles:
-                continue
+                return
             for color in set(tiles):
                 for line_idx in range(line_count):
-                    if not can_place(player, line_idx, color):
-                        continue
-                    append(
-                        Action(
-                            source_index=source_index,
-                            color=color,
-                            pattern_line=line_idx,
-                            take_first_player_token=False,
+                    if can_place(player, line_idx, color):
+                        append(
+                            Action(
+                                source_index=source_index,
+                                color=color,
+                                pattern_line=line_idx,
+                                take_first_player_token=take_token,
+                            )
                         )
-                    )
                 append(
                     Action(
                         source_index=source_index,
                         color=color,
                         pattern_line=floor,
-                        take_first_player_token=False,
-                    )
-                )
-
-        center_tiles = self.supply.center
-        if center_tiles:
-            take_token = self.first_player_token_in_center
-            for color in set(center_tiles):
-                for line_idx in range(line_count):
-                    if not can_place(player, line_idx, color):
-                        continue
-                    append(
-                        Action(
-                            source_index=center_idx,
-                            color=color,
-                            pattern_line=line_idx,
-                            take_first_player_token=take_token,
-                        )
-                    )
-                append(
-                    Action(
-                        source_index=center_idx,
-                        color=color,
-                        pattern_line=floor,
                         take_first_player_token=take_token,
                     )
                 )
+
+        for source_index, tiles in enumerate(self.supply.factories):
+            add_actions(source_index, tiles, False)
+        add_actions(Action.CENTER, self.supply.center, self.first_player_token_in_center)
         return actions
 
     def apply_action(self, action: Action) -> "GameState":
@@ -211,7 +208,7 @@ class GameState:
                     self.supply.discard.extend(line[1:])
                 player.pattern_lines[line_idx] = []
             floor_count = len(player.floor_line) + (1 if player.has_first_player_token else 0)
-            penalty = sum(FLOOR_PENALTIES[: min(floor_count, len(FLOOR_PENALTIES))])
+            penalty = sum(FLOOR_PENALTIES[:floor_count])
             player.score += penalty
             self.supply.discard.extend(player.floor_line)
             if player.has_first_player_token:
@@ -241,47 +238,28 @@ class GameState:
         self.phase = GamePhase.DRAFTING
 
     def _score_placement(self, player: PlayerBoard, row: int, col: int) -> int:
-        horizontal = 1
-        c = col - 1
-        while c >= 0 and player.wall[row][c]:
-            horizontal += 1
-            c -= 1
-        c = col + 1
-        while c < 5 and player.wall[row][c]:
-            horizontal += 1
-            c += 1
-        vertical = 1
-        r = row - 1
-        while r >= 0 and player.wall[r][col]:
-            vertical += 1
-            r -= 1
-        r = row + 1
-        while r < 5 and player.wall[r][col]:
-            vertical += 1
-            r += 1
+        horizontal = _line_len(player.wall, row, col, 0, 1)
+        vertical = _line_len(player.wall, row, col, 1, 0)
         horiz_score = horizontal if horizontal > 1 else 0
         vert_score = vertical if vertical > 1 else 0
-        if horiz_score == 0 and vert_score == 0:
-            return 1
-        return horiz_score + vert_score
+        return 1 if horiz_score == 0 and vert_score == 0 else horiz_score + vert_score
 
     def _apply_end_game_bonuses(self) -> None:
         for player in self.players:
-            for row in player.wall:
-                if all(row):
-                    player.score += 2
-            for col in range(5):
-                if all(player.wall[r][col] for r in range(5)):
-                    player.score += 7
-            for color in TileColor:
-                if all(player.wall[r][WALL_COLOR_TO_COL[r][color]] for r in range(5)):
-                    player.score += 10
+            wall = player.wall
+            player.score += 2 * sum(1 for row in wall if all(row))
+            player.score += 7 * sum(
+                1 for col in range(BOARD_SIZE) if all(wall[r][col] for r in range(BOARD_SIZE))
+            )
+            player.score += 10 * sum(
+                1
+                for color in TileColor
+                if all(wall[r][WALL_COLOR_TO_COL[r][color]] for r in range(BOARD_SIZE))
+            )
 
     def _refill_factories(self) -> None:
-        for f in range(len(self.supply.factories)):
-            self.supply.factories[f] = []
-            tiles = self._draw_tiles(4)
-            self.supply.factories[f].extend(tiles)
+        for idx in range(len(self.supply.factories)):
+            self.supply.factories[idx] = self._draw_tiles(4)
         self.supply.center = []
 
     def _draw_tiles(self, count: int) -> list[TileColor]:

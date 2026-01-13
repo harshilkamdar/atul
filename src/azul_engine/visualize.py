@@ -13,6 +13,10 @@ COLOR_MAP = {
 }
 
 
+def _add_tile(ax: plt.Axes, x: float, y: float, color: str) -> None:
+    ax.add_patch(patches.Rectangle((x, y), 0.9, 0.9, linewidth=1, edgecolor="gray", facecolor=color))
+
+
 def plot_player_board(ax: plt.Axes, state: GameState, player_idx: int) -> None:
     player = state.players[player_idx]
     ax.set_title(f"Player {player_idx} (score {player.score})")
@@ -27,8 +31,7 @@ def plot_player_board(ax: plt.Axes, state: GameState, player_idx: int) -> None:
             x = 4 - c
             y = r
             color = COLOR_MAP.get(line[0], "#CCCCCC") if c < len(line) else "#FFFFFF"
-            rect = patches.Rectangle((x, y), 0.9, 0.9, linewidth=1, edgecolor="gray", facecolor=color)
-            ax.add_patch(rect)
+            _add_tile(ax, x, y, color)
 
     for r, row in enumerate(player.wall):
         for c, filled in enumerate(row):
@@ -36,12 +39,10 @@ def plot_player_board(ax: plt.Axes, state: GameState, player_idx: int) -> None:
             y = r
             base_color = COLOR_MAP[WALL_PATTERN[r][c]]
             face = base_color if filled else "#FFFFFF"
-            rect = patches.Rectangle((x, y), 0.9, 0.9, linewidth=1, edgecolor="gray", facecolor=face)
-            ax.add_patch(rect)
+            _add_tile(ax, x, y, face)
 
     for i, tile in enumerate(player.floor_line):
-        rect = patches.Rectangle((i, 5), 0.9, 0.9, linewidth=1, edgecolor="gray", facecolor=COLOR_MAP[tile])
-        ax.add_patch(rect)
+        _add_tile(ax, i, 5, COLOR_MAP[tile])
     if player.has_first_player_token:
         ax.text(5.2, 5.5, "FP", fontsize=10, color="black")
 

@@ -44,7 +44,7 @@ Policy = Callable[[GameState], Action]
 def _floor_penalty_estimate(count: int) -> int:
     if count <= 0:
         return 0
-    return sum(FLOOR_PENALTIES[: min(count, len(FLOOR_PENALTIES))])
+    return sum(FLOOR_PENALTIES[:count])
 
 
 def _adjacency_potential(wall: list[list[bool]], row: int, col: int) -> int:
@@ -77,10 +77,7 @@ def _endgame_progress(player_wall: list[list[bool]], row: int, col: int, color: 
         bonuses += 1.5
     if all(player_wall[r][col] or r == row for r in range(5)):
         bonuses += 2.0
-    color_hits = 1
-    for r in range(5):
-        if player_wall[r][WALL_COLOR_TO_COL[r][color]]:
-            color_hits += 1
+    color_hits = 1 + sum(1 for r in range(5) if player_wall[r][WALL_COLOR_TO_COL[r][color]])
     if color_hits >= 4:
         bonuses += 2.5
     return bonuses
@@ -112,15 +109,16 @@ def _opp_deny_score(state: GameState, action: Action) -> float:
 def score_action(state: GameState, action: Action) -> float:
     player = state.players[state.current_player]
     tiles_taken = _tiles_taken(state, action)
+    token_penalty = 1 if action.take_first_player_token else 0
     if action.pattern_line == Action.FLOOR:
-        spill = tiles_taken + (1 if action.take_first_player_token else 0)
+        spill = tiles_taken + token_penalty
         floor_pen = _floor_penalty_estimate(spill)
         return -5.0 * spill + floor_pen
 
     capacity = PATTERN_LINE_SIZES[action.pattern_line]
     current_len = len(player.pattern_lines[action.pattern_line])
     spill = max(current_len + tiles_taken - capacity, 0)
-    floor_pen = _floor_penalty_estimate(spill + (1 if action.take_first_player_token else 0))
+    floor_pen = _floor_penalty_estimate(spill + token_penalty)
 
     score = -3.0 * spill + floor_pen
     score += (5 - capacity) * 0.2
@@ -181,13 +179,30 @@ def prune_and_order_actions(state: GameState, actions: list[Action], top_k: int 
     return ordered
 
 
-def _choose_action_with_policy(state: GameState, policy: Policy | None, rng: random.Random) -> Action:
-    if policy is not None:
-        return policy(state)
-    actions = state.legal_actions()
-    if not actions:
-        raise RuntimeError("no legal actions available")
-    return rng.choice(actions)
+def _rollout_value(
+    state: GameState,
+    perspective: int,
+    depth_limit: int | None,
+    policy: Policy | None,
+    rng: random.Random,
+    use_leaf: bool,
+) -> float:
+    depth = 0
+    while not state.is_terminal() and (depth_limit is None or depth < depth_limit):
+        if policy is None:
+            actions = state.legal_actions()
+            if not actions:
+                break
+            action = rng.choice(actions)
+        else:
+            action = policy(state)
+        state.apply_action(action)
+        depth += 1
+    if not state.is_terminal() and use_leaf:
+        return _leaf_evaluation(state, perspective)
+    scores = [p.score for p in state.players]
+    opp_best = max(s for i, s in enumerate(scores) if i != perspective) if len(scores) > 1 else 0
+    return scores[perspective] - opp_best
 
 
 def _resolve_policy(name: str | None) -> Policy | None:
@@ -258,7 +273,7 @@ class RolloutAgent:
     rng: random.Random = field(default_factory=random.Random)
     rollout_policy: Policy | None = None
     prune_top_k: int | None = 12
-    leaf_value: bool = True
+    leaf_value: bool = False
 
     def select_action(self, state: GameState) -> Action:
         actions = prune_and_order_actions(state, state.legal_actions(), top_k=self.prune_top_k)
@@ -281,21 +296,14 @@ class RolloutAgent:
         return _sorted_actions(best_actions)[0]
 
     def _playout(self, state: GameState, perspective: int) -> float:
-        depth = 0
-        while not state.is_terminal() and (self.depth_limit is None or depth < self.depth_limit):
-            actions = state.legal_actions()
-            if not actions:
-                break
-            action = _choose_action_with_policy(state, self.rollout_policy, self.rng)
-            state.apply_action(action)
-            depth += 1
-        return self._evaluate(state, perspective)
-
-    @staticmethod
-    def _evaluate(state: GameState, perspective: int) -> float:
-        scores = [p.score for p in state.players]
-        opp_best = max(s for i, s in enumerate(scores) if i != perspective) if len(scores) > 1 else 0
-        return scores[perspective] - opp_best
+        return _rollout_value(
+            state,
+            perspective,
+            self.depth_limit,
+            self.rollout_policy,
+            self.rng,
+            self.leaf_value,
+        )
 
 
 @dataclass
@@ -347,19 +355,14 @@ class TimedRolloutAgent:
         return _sorted_actions(best_actions)[0]
 
     def _playout(self, state: GameState, perspective: int) -> float:
-        depth = 0
-        while not state.is_terminal() and (self.depth_limit is None or depth < self.depth_limit):
-            actions = state.legal_actions()
-            if not actions:
-                break
-            action = _choose_action_with_policy(state, self.rollout_policy, self.rng)
-            state.apply_action(action)
-            depth += 1
-        scores = [p.score for p in state.players]
-        opp_best = max(s for i, s in enumerate(scores) if i != perspective) if len(scores) > 1 else 0
-        if not state.is_terminal() and self.leaf_value:
-            return _leaf_evaluation(state, perspective)
-        return scores[perspective] - opp_best
+        return _rollout_value(
+            state,
+            perspective,
+            self.depth_limit,
+            self.rollout_policy,
+            self.rng,
+            self.leaf_value,
+        )
 
 
 def _parallel_rollout_worker(args) -> float:
@@ -371,20 +374,7 @@ def _parallel_rollout_worker(args) -> float:
         sim_state = state.clone()
         sim_state.rng = random.Random(rng.random())
         sim_state.apply_action(action)
-        depth = 0
-        while not sim_state.is_terminal() and (depth_limit is None or depth < depth_limit):
-            actions = sim_state.legal_actions()
-            if not actions:
-                break
-            chosen = _choose_action_with_policy(sim_state, policy, rng)
-            sim_state.apply_action(chosen)
-            depth += 1
-        if not sim_state.is_terminal():
-            total += _leaf_evaluation(sim_state, perspective)
-        else:
-            scores = [p.score for p in sim_state.players]
-            opp_best = max(s for i, s in enumerate(scores) if i != perspective) if len(scores) > 1 else 0
-            total += scores[perspective] - opp_best
+        total += _rollout_value(sim_state, perspective, depth_limit, policy, rng, True)
     return total
 
 
@@ -537,19 +527,14 @@ class MCTSAgent:
         return max(node.children, key=uct_score)
 
     def _rollout(self, state: GameState, perspective: int) -> float:
-        depth = 0
-        while not state.is_terminal() and (self.rollout_depth is None or depth < self.rollout_depth):
-            actions = state.legal_actions()
-            if not actions:
-                break
-            action = _choose_action_with_policy(state, self.rollout_policy, self.rng)
-            state.apply_action(action)
-            depth += 1
-        if not state.is_terminal():
-            return _leaf_evaluation(state, perspective)
-        scores = [p.score for p in state.players]
-        opp_best = max(s for i, s in enumerate(scores) if i != perspective) if len(scores) > 1 else 0
-        return scores[perspective] - opp_best
+        return _rollout_value(
+            state,
+            perspective,
+            self.rollout_depth,
+            self.rollout_policy,
+            self.rng,
+            True,
+        )
 
     def _count_nodes(self, node: "Node") -> int:
         return 1 + sum(self._count_nodes(c) for c in node.children)

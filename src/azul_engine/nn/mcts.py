@@ -99,26 +99,25 @@ class MCTS:
     def _select(self, root: Node, root_state: GameState) -> tuple[Node, GameState]:
         node = root
         state = root_state.clone()
+        num_factories = len(state.supply.factories)
         while node.children:
             total_visits = sum(child.visits for child in node.children.values())
-            best_idx, best_child = None, None
-            best_score = float("-inf")
-            for idx, child in node.children.items():
-                u = self.cpuct * child.prior * math.sqrt(total_visits + 1) / (1 + child.visits)
-                score = child.q() + u
-                if score > best_score:
-                    best_score = score
-                    best_idx, best_child = idx, child
-            assert best_child is not None
-            node = best_child
-            src, color, dest = components_from_action_index(best_idx, len(state.supply.factories))
+            best_idx, node = max(
+                node.children.items(),
+                key=lambda item: item[1].q()
+                + self.cpuct
+                * item[1].prior
+                * math.sqrt(total_visits + 1)
+                / (1 + item[1].visits),
+            )
+            src, color, dest = components_from_action_index(best_idx, num_factories)
             action = Action(
                 source_index=src,
                 color=color,
                 pattern_line=dest if dest < 5 else Action.FLOOR,
                 take_first_player_token=src == Action.CENTER and state.first_player_token_in_center,
             )
-            state = state.clone().apply_action(action)
+            state.apply_action(action)
             if node.visits == 0:
                 break
         return node, state
@@ -171,12 +170,16 @@ class MCTS:
             state.first_player_token_in_center,
             state.first_player_index,
         )
-        players = []
-        for p in state.players:
-            pattern = tuple(tuple(t.value for t in line) for line in p.pattern_lines)
-            wall = tuple(tuple(row) for row in p.wall)
-            floor = tuple(t.value for t in p.floor_line)
-            players.append((pattern, wall, floor, p.has_first_player_token, p.score))
+        players = [
+            (
+                tuple(tuple(t.value for t in line) for line in p.pattern_lines),
+                tuple(tuple(row) for row in p.wall),
+                tuple(t.value for t in p.floor_line),
+                p.has_first_player_token,
+                p.score,
+            )
+            for p in state.players
+        ]
         return (
             state.current_player,
             state.phase.value,

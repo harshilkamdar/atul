@@ -37,11 +37,15 @@ def components_from_action_index(idx: int, num_factories: int) -> tuple[int, Til
 
 def legal_action_indices(state: GameState) -> list[int]:
     num_factories = len(state.supply.factories)
-    indices = []
-    for act in state.legal_actions():
-        dest_slot = act.pattern_line if act.pattern_line != Action.FLOOR else 5
-        indices.append(action_index_from_components(act.source_index, act.color, dest_slot, num_factories))
-    return indices
+    return [
+        action_index_from_components(
+            act.source_index,
+            act.color,
+            act.pattern_line if act.pattern_line != Action.FLOOR else 5,
+            num_factories,
+        )
+        for act in state.legal_actions()
+    ]
 
 
 def _pad_factories(state: GameState) -> torch.Tensor:
@@ -70,6 +74,13 @@ def _wall_features(player) -> torch.Tensor:
     return wall.view(5, 5)
 
 
+def _tile_counts(tiles) -> torch.Tensor:
+    counts = torch.zeros(len(COLOR_ORDER), dtype=torch.float32)
+    for t in tiles:
+        counts[COLOR_TO_IDX[t]] += 1.0
+    return counts
+
+
 def encode_state(state: GameState) -> torch.Tensor:
     """Encode game state into a flat feature vector (current-player perspective)."""
     num_players = len(state.players)
@@ -89,20 +100,14 @@ def encode_state(state: GameState) -> torch.Tensor:
     opp_wall = _wall_features(opponent).flatten()
 
     def floor_feats(p) -> torch.Tensor:
-        hist = torch.zeros(len(COLOR_ORDER), dtype=torch.float32)
-        for t in p.floor_line:
-            hist[COLOR_TO_IDX[t]] += 1.0
+        hist = _tile_counts(p.floor_line)
         return torch.cat([torch.tensor([len(p.floor_line)], dtype=torch.float32), hist])
 
     self_floor = floor_feats(player)
     opp_floor = floor_feats(opponent)
 
-    bag_counts = torch.zeros(len(COLOR_ORDER), dtype=torch.float32)
-    discard_counts = torch.zeros(len(COLOR_ORDER), dtype=torch.float32)
-    for t in state.supply.bag:
-        bag_counts[COLOR_TO_IDX[t]] += 1.0
-    for t in state.supply.discard:
-        discard_counts[COLOR_TO_IDX[t]] += 1.0
+    bag_counts = _tile_counts(state.supply.bag)
+    discard_counts = _tile_counts(state.supply.discard)
 
     scores = torch.tensor(
         [player.score / 100.0, opponent.score / 100.0, state.round_number / 10.0], dtype=torch.float32

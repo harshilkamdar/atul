@@ -75,7 +75,8 @@ def _build_tasks(
     swap: bool,
 ) -> list[Task]:
     rng = random.SystemRandom() if seed is None else random.Random(seed)
-    used_seeds = set()
+    pair_count = len(models) * (len(models) - 1) // 2
+    seed_iter = iter(rng.sample(range(1_000_000_000), pair_count * games_per_pair))
     tasks = []
     for i, model_a in enumerate(models):
         for model_b in models[i + 1 :]:
@@ -86,11 +87,7 @@ def _build_tasks(
                 rng.shuffle(swap_flags)
             for run_idx, swap_sides in enumerate(swap_flags):
                 play_a, play_b = (model_b, model_a) if (swap and swap_sides) else (model_a, model_b)
-                while True:
-                    game_seed = rng.randrange(1_000_000_000)
-                    if game_seed not in used_seeds:
-                        used_seeds.add(game_seed)
-                        break
+                game_seed = next(seed_iter)
                 out_path = out_dir / f"{pair_slug}_{run_idx:03d}.jsonl"
                 tasks.append(Task(play_a, play_b, run_idx, game_seed, out_path))
     rng.shuffle(tasks)
@@ -133,8 +130,7 @@ def run_arena(
     if len(models) < 2:
         raise ValueError("need at least two models")
 
-    if isinstance(out_dir, str):
-        out_dir = Path(out_dir)
+    out_dir = Path(out_dir)
     tasks = _build_tasks(models, games_per_pair, seed, out_dir, swap_sides)
 
     provider_map = _normalize_provider_map(models, providers)
@@ -149,9 +145,9 @@ def run_arena(
         for future in as_completed(futures):
             result = future.result()
             if progress and result:
-                models = result.get("models") or []
+                result_models = result.get("models") or []
                 scores = result.get("scores") or []
-                if len(models) == 2 and len(scores) == 2:
-                    print(f"{models[0]} vs {models[1]} | {scores[0]}-{scores[1]}")
+                if len(result_models) == 2 and len(scores) == 2:
+                    print(f"{result_models[0]} vs {result_models[1]} | {scores[0]}-{scores[1]}")
 
     return [task.out_path for task in tasks]

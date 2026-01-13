@@ -3,6 +3,13 @@ import json
 from azul_engine import GameEngine, LLMAgent
 from azul_engine.serialization import action_to_dict, state_to_dict
 
+SNAPSHOT_KWARGS = {
+    "include_supply_contents": True,
+    "include_rng": True,
+    "include_round_log": True,
+    "include_first_player_index": True,
+}
+
 
 def _extract_rationale(raw: str | None) -> str | None:
     if not raw:
@@ -31,6 +38,7 @@ def run_series(
     on_turn=None,
 ) -> list[dict]:
     results = []
+    models = [model_a, model_b]
     for game_idx in range(games):
         game_seed = seed + game_idx
         engine = GameEngine(seed=game_seed)
@@ -46,20 +54,14 @@ def run_series(
                 "type": "game_start",
                 "game": game_idx,
                 "seed": game_seed,
-                "models": [model_a, model_b],
+                "models": models,
             },
         )
 
         while not state.is_terminal():
             current = state.current_player
             agent = agents[current]
-            snapshot = state_to_dict(
-                state,
-                include_supply_contents=True,
-                include_rng=True,
-                include_round_log=True,
-                include_first_player_index=True,
-            )
+            snapshot = state_to_dict(state, **SNAPSHOT_KWARGS)
             scores_before = [p.score for p in state.players]
 
             action = agent.select_action(state)
@@ -87,7 +89,7 @@ def run_series(
             )
             if on_turn:
                 info = {
-                    "models": [model_a, model_b],
+                    "models": models,
                     "scores": scores_after,
                     "player": current,
                     "game": game_idx,
@@ -101,12 +103,13 @@ def run_series(
         scores = [p.score for p in state.players]
         max_score = max(scores)
         winners = [i for i, score in enumerate(scores) if score == max_score]
+        winner = winners[0] if len(winners) == 1 else None
         result = {
             "game": game_idx,
             "seed": game_seed,
-            "models": [model_a, model_b],
+            "models": models,
             "scores": scores,
-            "winner": winners[0] if len(winners) == 1 else None,
+            "winner": winner,
             "winners": winners,
         }
         _log(out, {"type": "game_end", **result})

@@ -55,8 +55,7 @@ class ReplayBuffer:
     def sample(self, batch_size: int) -> list[TrainingSample]:
         if batch_size >= len(self.buffer):
             return list(self.buffer)
-        indices = random.sample(range(len(self.buffer)), batch_size)
-        return [self.buffer[i] for i in indices]
+        return random.sample(self.buffer, batch_size)
 
     def iter_batches(self, batch_size: int):
         if not self.buffer:
