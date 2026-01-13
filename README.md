@@ -1,26 +1,30 @@
-## Azul engine skeleton
+# Azul sandbox
 
-This repository implements a simple Azul rules engine to support scalable oversight experiments. The engine targets determinism and ease of simulation (legal action listing, cloning, fast scoring).
+This repo uses Azul as a sandbox for:
+- learning LLM capability in rule-following, long-horizon planning, and state tracking
+- training AlphaZero-style MCTS agents
+- controlled experiments around imperfect reward signals for RL
 
-### Layout
-- `src/azul_engine/enums.py` – tile and phase enumerations.
-- `src/azul_engine/actions.py` – move representation and constants for center/floor.
-- `src/azul_engine/player.py` – player board data structures and defaults.
-- `src/azul_engine/state.py` – full game rules, legal action generation, scoring, and round management.
-- `src/azul_engine/agents.py` – simple agents (random, first-legal, greedy fill).
+## Install
 
-### Notes
-- Supports 2–4 players with standard factory counts and tile distribution.
-- Implements drafting, pattern line validation/overflow to floor, adjacency scoring, floor penalties, and end-game bonuses (rows, columns, color sets).
-- First-player token is tracked via flags rather than as a tile; penalties account for it.
-
-### Quick start
+Using uv:
 ```bash
-uv run python - <<'PY'
-from azul_engine import GameEngine, Action, TileColor
-
-engine = GameEngine(seed=0)
-state = engine.reset()
-print(f"Legal actions at start: {len(state.legal_actions())}")
-PY
+uv venv
+uv sync
 ```
+
+Using pip:
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+## Directory structure
+
+- `src/azul_engine/` core rules engine and state serialization
+- `src/azul_agents/` baseline agents and LLM integration
+- `src/azul_nn/` neural features, models, and self-play training
+- `src/evals/` arena runners and evaluation scripts
+- `tests/` unit tests
+- `notebooks/` analysis and experiments
