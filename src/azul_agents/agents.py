@@ -8,11 +8,12 @@ from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Callable, Iterable
 
-from .actions import Action
+from azul_engine.actions import Action
+from azul_engine.enums import TileColor
+from azul_engine.player import PATTERN_LINE_SIZES
+from azul_engine.state import FLOOR_PENALTIES, WALL_COLOR_TO_COL, GameState
+
 from .agents_evaluation import _leaf_evaluation
-from .enums import TileColor
-from .player import PATTERN_LINE_SIZES
-from .state import FLOOR_PENALTIES, WALL_COLOR_TO_COL, GameState
 
 
 class Agent:

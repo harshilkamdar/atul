@@ -5,8 +5,8 @@ from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 
-from ..actions import Action
-from ..state import GameEngine, GameState
+from azul_engine.actions import Action
+from azul_engine.state import GameEngine, GameState
 from .features import ACTION_DIM, components_from_action_index, encode_state, legal_action_indices
 from .mcts import MCTS
 from .model import AzulNet

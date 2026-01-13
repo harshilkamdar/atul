@@ -1,6 +1,7 @@
 import json
 
-from azul_engine import GameEngine, LLMAgent
+from azul_agents import LLMAgent
+from azul_engine import GameEngine
 from azul_engine.serialization import action_to_dict, state_to_dict
 
 SNAPSHOT_KWARGS = {

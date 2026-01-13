@@ -1,5 +1,6 @@
-from azul_engine import GameEngine, LLMAgent
-import azul_engine.llm_agent as llm_agent_module
+import azul_agents.llm_agent as llm_agent_module
+from azul_agents import LLMAgent
+from azul_engine import GameEngine
 
 
 def test_llm_agent_retries_then_fallback(monkeypatch):

@@ -1,18 +1,16 @@
 import random
 from types import SimpleNamespace
 
-from azul_engine import (
-    Action,
+from azul_agents import (
     FirstLegalAgent,
-    GameEngine,
     GreedyFillAgent,
     MCTSAgent,
     ParallelRolloutAgent,
     RandomAgent,
     RolloutAgent,
     TimedRolloutAgent,
-    TileColor,
 )
+from azul_engine import Action, GameEngine, TileColor
 
 
 def test_random_agent_picks_from_available():

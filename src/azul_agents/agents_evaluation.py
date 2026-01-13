@@ -1,5 +1,5 @@
-from .state import FLOOR_PENALTIES, WALL_COLOR_TO_COL, WALL_PATTERN, GameState
-from .enums import TileColor
+from azul_engine.enums import TileColor
+from azul_engine.state import FLOOR_PENALTIES, WALL_COLOR_TO_COL, WALL_PATTERN, GameState
 
 
 def _leaf_evaluation(state: GameState, perspective: int) -> float:

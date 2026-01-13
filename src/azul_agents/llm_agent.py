@@ -8,10 +8,11 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
-from .actions import Action
+from azul_engine.actions import Action
+from azul_engine.serialization import state_to_dict
+from azul_engine.state import GameState
+
 from .agents import prune_and_order_actions
-from .state import GameState
-from .serialization import state_to_dict
 
 
 DEFAULT_MODEL = "google/gemini-3-pro-preview"

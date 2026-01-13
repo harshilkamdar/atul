@@ -3,8 +3,8 @@ from dataclasses import dataclass, field
 
 import torch
 
-from ..actions import Action
-from ..state import GameState
+from azul_engine.actions import Action
+from azul_engine.state import GameState
 from .features import (
     ACTION_DIM,
     COLOR_ORDER,

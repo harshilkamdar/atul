@@ -1,9 +1,9 @@
 import torch
 
-from ..actions import Action
-from ..enums import TileColor
-from ..player import PATTERN_LINE_SIZES
-from ..state import GameState
+from azul_engine.actions import Action
+from azul_engine.enums import TileColor
+from azul_engine.player import PATTERN_LINE_SIZES
+from azul_engine.state import GameState
 
 COLOR_ORDER = [
     TileColor.BLUE,

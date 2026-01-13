@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-from .agents import Agent
 from .state import GameEngine, GameState
 
 
@@ -10,7 +9,7 @@ class GameResult:
     scores: list[int]
 
 
-def play_game(agents: list[Agent], *, seed: int | None = None) -> GameResult:
+def play_game(agents, *, seed: int | None = None) -> GameResult:
     engine = GameEngine(num_players=len(agents), seed=seed)
     state = engine.reset()
     while not state.is_terminal():
@@ -22,5 +21,5 @@ def play_game(agents: list[Agent], *, seed: int | None = None) -> GameResult:
     return GameResult(final_state=state, scores=scores)
 
 
-def play_series(agents: list[Agent], games: int, *, seed: int | None = None) -> list[GameResult]:
+def play_series(agents, games: int, *, seed: int | None = None) -> list[GameResult]:
     return [play_game(agents, seed=None if seed is None else seed + i) for i in range(games)]

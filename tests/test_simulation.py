@@ -1,12 +1,5 @@
-from azul_engine import (
-    FirstLegalAgent,
-    GamePhase,
-    GameResult,
-    GreedyFillAgent,
-    RandomAgent,
-    play_game,
-    play_series,
-)
+from azul_agents import FirstLegalAgent, GreedyFillAgent, RandomAgent
+from azul_engine import GamePhase, GameResult, play_game, play_series
 
 
 def test_play_game_reaches_terminal_state():
