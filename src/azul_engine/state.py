@@ -1,3 +1,5 @@
+"""Azul rules engine: state, legal actions, scoring, and round flow."""
+
 import random
 from dataclasses import dataclass, field
 
@@ -39,6 +41,7 @@ def _line_len(wall, row, col, dr, dc):
 
 @dataclass
 class Supply:
+    """Shared tile supply: bag, discard, factories, and center."""
     bag: list[TileColor] = field(default_factory=list)
     discard: list[TileColor] = field(default_factory=list)
     factories: list[list[TileColor]] = field(default_factory=list)
@@ -55,6 +58,7 @@ class Supply:
 
 @dataclass
 class GameState:
+    """Mutable game state for a single Azul match."""
     players: list[PlayerBoard]
     current_player: int
     phase: GamePhase
@@ -80,6 +84,7 @@ class GameState:
         )
 
     def legal_actions(self) -> list[Action]:
+        """Return all legal draft actions for the current player."""
         if self.phase != GamePhase.DRAFTING:
             return []
         player = self.players[self.current_player]
@@ -118,6 +123,7 @@ class GameState:
         return actions
 
     def apply_action(self, action: Action) -> "GameState":
+        """Apply a draft action and advance turn/round state in place."""
         if self.phase != GamePhase.DRAFTING:
             raise RuntimeError("cannot apply draft action outside drafting phase")
         player = self.players[self.current_player]
@@ -192,6 +198,7 @@ class GameState:
             self.current_player = (self.current_player + 1) % len(self.players)
 
     def _score_and_refill(self) -> None:
+        """Score completed lines, apply floor penalties, and start next round."""
         for idx, player in enumerate(self.players):
             gained_this_round = 0
             for line_idx, capacity in enumerate(PATTERN_LINE_SIZES):
@@ -276,6 +283,7 @@ class GameState:
 
 
 class GameEngine:
+    """Game wrapper that owns RNG and exposes reset/step helpers."""
     def __init__(self, num_players: int = 2, *, seed: int | None = None) -> None:
         if num_players not in (2, 3, 4):
             raise ValueError("Azul supports 2-4 players")
@@ -284,6 +292,7 @@ class GameEngine:
         self.state: GameState | None = None
 
     def reset(self) -> GameState:
+        """Create a fresh game state and deal the first factories."""
         factories_by_players = {2: 5, 3: 7, 4: 9}[self.num_players]
         bag = []
         for color in TileColor:

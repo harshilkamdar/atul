@@ -25,3 +25,6 @@ dev = [
     "pytest",
     "ruff",
 ]
+
+[tool.uv.build]
+packages = ["azul_engine", "azul_agents", "azul_nn", "evals"]
